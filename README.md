@@ -61,25 +61,26 @@
 当前仓库结构如下：
 
 ```text
-skill/
-├── SKILL.md
+repo-root/
 ├── README.md
-├── prompts/
-│   ├── intake.md
-│   ├── result_extractor.md
-│   ├── work_unit_merger.md
-│   └── report_writer.md
-└── references/
-    ├── codex_log_workflow.md
-    ├── judging_rules.md
-    └── output_rules.md
+└── dailyreport/
+    ├── SKILL.md
+    ├── prompts/
+    │   ├── intake.md
+    │   ├── result_extractor.md
+    │   ├── work_unit_merger.md
+    │   └── report_writer.md
+    └── references/
+        ├── codex_log_workflow.md
+        ├── judging_rules.md
+        └── output_rules.md
 ```
 
 各文件职责如下。
 
 ### `SKILL.md`
 
-这是运行时主入口，供 `Codex` 触发和执行使用。
+真正的 Skill 根目录位于 `dailyreport/` 下，`dailyreport/SKILL.md` 是运行时主入口，供 `Codex` 触发和执行使用。
 
 它负责：
 
@@ -104,7 +105,7 @@ skill/
 - 说明如何安装、使用和测试
 - 说明当前限制和迁移方式
 
-### `prompts/`
+### `dailyreport/prompts/`
 
 这一层用于把蒸馏链路拆成多个职责清晰的阶段。
 
@@ -130,7 +131,7 @@ skill/
 
 用于把筛选后的 `Work Unit` 转写为最终中文纯文本总结。
 
-### `references/`
+### `dailyreport/references/`
 
 这一层用于存放规则和宿主相关说明。
 
@@ -258,7 +259,7 @@ skill/
 
 ### 本地安装到当前 Codex
 
-当前推荐的安装方式是将本仓库挂到：
+当前推荐的安装方式是将仓库中的 `dailyreport/` 目录挂到：
 
 ```text
 ~/.codex/skills/daily-work
@@ -271,14 +272,14 @@ Windows 示例：
 ```powershell
 New-Item -ItemType Junction `
   -Path $HOME\.codex\skills\daily-work `
-  -Target C:\Users\zhangyifan\Desktop\Dailyreport\skill
+  -Target C:\Users\zhangyifan\Desktop\Dailyreport\skill\dailyreport
 ```
 
 Linux 示例：
 
 ```bash
 mkdir -p ~/.codex/skills
-ln -s /path/to/skill ~/.codex/skills/daily-work
+ln -s /path/to/repo/dailyreport ~/.codex/skills/daily-work
 ```
 
 安装后建议重启 `Codex CLI`，以确保新 Skill 被重新发现。
@@ -310,6 +311,8 @@ ln -s /path/to/skill ~/.codex/skills/daily-work
 本仓库当前已经完成过以下验证：
 
 - Skill 已安装到当前 `Codex` 技能目录
+- 当前仓库根目录仅保留 `README.md`
+- 真正的 Skill 内容位于 `dailyreport/` 目录
 - 新起的 `codex exec` 进程能够发现并执行该 Skill
 - Skill 能从 `~/.codex/sessions/.../rollout-*.jsonl` 读取会话日志
 - Skill 能输出按结果组织的中文周期总结
@@ -319,7 +322,7 @@ ln -s /path/to/skill ~/.codex/skills/daily-work
 当前结构非常适合迁移到 Linux，原因是：
 
 - 当前版本没有平台专属脚本
-- 蒸馏逻辑都在 `SKILL.md / prompts / references`
+- 蒸馏逻辑都在 `dailyreport/SKILL.md`、`dailyreport/prompts/`、`dailyreport/references/`
 - 唯一平台相关点主要是日志发现路径
 
 只要 Linux 上的 `Codex` 日志结构仍然满足：
@@ -332,7 +335,7 @@ ln -s /path/to/skill ~/.codex/skills/daily-work
 
 如果未来 Linux 侧日志结构与当前不同，通常只需要调整：
 
-- `references/codex_log_workflow.md`
+- `dailyreport/references/codex_log_workflow.md`
 
 而不需要推倒整个蒸馏规则层。
 
@@ -372,8 +375,8 @@ ln -s /path/to/skill ~/.codex/skills/daily-work
 维护这个 Skill 时，建议遵循以下分层，不要把职责混在一起：
 
 - `SKILL.md`：入口与流程，不堆长规则
-- `prompts/`：蒸馏阶段逻辑
-- `references/`：宿主规则与判定规则
+- `dailyreport/prompts/`：蒸馏阶段逻辑
+- `dailyreport/references/`：宿主规则与判定规则
 - `README.md`：给人看的仓库说明
 
 如果后续确实出现“日志读取必须程序化”的需求，再单独引入 `tools/` 或脚本层，而不是提前过度设计。
