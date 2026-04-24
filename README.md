@@ -1,12 +1,12 @@
 # Daily Work Skill
 
-一个运行在 `Codex CLI` 中的日报蒸馏 Skill，用于从 `Codex` 本地对话日志中提取`已完成且有意义`的工作结果，并生成可直接汇报的中文纯文本总结。
+一个跨 `Codex`、`Claude Code` 与 `OpenClaw` 的日报蒸馏 Skill，用于从当前宿主的本地对话日志中提取`已完成且有意义`的工作结果，并生成可直接汇报的中文纯文本总结。
 
 ## 1. 项目目标
 
 这个 Skill 要解决的问题不是“把对话简单摘要一下”，而是：
 
-从一天或最近若干自然日的 `Codex` 对话日志中，识别真正完成了什么工作，并把这些结果整理成可直接汇报的中文工作总结。
+从一天或最近若干自然日的当前宿主对话日志中，识别真正完成了什么工作，并把这些结果整理成可直接汇报的中文工作总结。
 
 它关注的是：
 
@@ -25,8 +25,10 @@
 
 当前版本是 `V1`，边界已经明确固定：
 
-- 只支持 `Codex CLI`
-- 只使用 `Codex` 对话日志作为事实来源
+- 支持 `Codex`
+- 支持 `Claude Code`
+- 支持 `OpenClaw`
+- 只使用当前宿主的本地对话日志作为事实来源
 - 默认按当天自然日汇总
 - 支持“最近 N 个自然日”的时间窗口表达
 - 只输出中文纯文本总结
@@ -35,7 +37,7 @@
 
 以下内容明确不属于当前版本：
 
-- `Claude Code`、`OpenCode` 或其他 agent
+- 其他未适配 agent
 - `Git commit / diff`
 - 文件修改记录
 - `shell / test` 记录
@@ -71,8 +73,10 @@ repo-root/
     │   ├── work_unit_merger.md
     │   └── report_writer.md
     └── references/
+        ├── claude_code_log_workflow.md
         ├── codex_log_workflow.md
         ├── judging_rules.md
+        ├── openclaw_log_workflow.md
         └── output_rules.md
 ```
 
@@ -80,7 +84,7 @@ repo-root/
 
 ### `SKILL.md`
 
-真正的 Skill 根目录位于 `dailyreport/` 下，`dailyreport/SKILL.md` 是运行时主入口，供 `Codex` 触发和执行使用。
+真正的 Skill 根目录位于 `dailyreport/` 下，`dailyreport/SKILL.md` 是运行时主入口，供当前宿主触发和执行使用。
 
 它负责：
 
@@ -137,7 +141,15 @@ repo-root/
 
 #### `references/codex_log_workflow.md`
 
-定义日志读取主链路，只允许从 `Codex` 本地会话日志中读取事实。
+定义 `Codex` 宿主下的日志读取主链路。
+
+#### `references/claude_code_log_workflow.md`
+
+定义 `Claude Code` 宿主下的日志读取主链路。
+
+#### `references/openclaw_log_workflow.md`
+
+定义 `OpenClaw` 宿主下的日志读取主链路。
 
 #### `references/judging_rules.md`
 
@@ -152,30 +164,40 @@ repo-root/
 这个 Skill 的主流程可以概括为：
 
 1. 收口用户请求
-2. 读取目标时间窗口内的 `Codex` 会话日志
-3. 识别已完成且有意义的结果
-4. 将碎片对话组织成内部 `Work Unit`
-5. 输出最终中文纯文本总结
+2. 识别当前宿主
+3. 读取目标时间窗口内的当前宿主会话日志
+4. 识别已完成且有意义的结果
+5. 将碎片对话组织成内部 `Work Unit`
+6. 输出最终中文纯文本总结
 
 从概念上看，整体链路是：
 
-`Codex 对话日志 -> 完成结果 -> Work Unit -> 中文工作总结`
+`当前宿主对话日志 -> 完成结果 -> Work Unit -> 中文工作总结`
 
 ## 6. 日志来源
 
-当前版本只使用这一条日志主链路：
+当前版本会根据宿主选择日志主链路：
 
 ```text
-~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+Codex: ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+Claude Code: ~/.claude/projects/**/*.jsonl
+OpenClaw: ~/.openclaw/agents/*/sessions/*.jsonl
 ```
 
-这是当前版本唯一认可的事实源。
+处理原则如下：
+
+- 在 `Codex` 中，只读取 `Codex` 日志
+- 在 `Claude Code` 中，只读取 `Claude Code` 日志
+- 在 `OpenClaw` 中，只读取 `OpenClaw` 日志
+- 不跨宿主混用日志
 
 以下内容不会被纳入主链路：
 
 - `~/.codex/history.jsonl`
 - `~/.codex/logs_2.sqlite`
 - `state_*.sqlite`
+- `~/.claude/file-history/`
+- `~/.openclaw/agents/*/sessions/sessions.json`
 - `Git / diff / shell / test`
 
 原因是当前 `V1` 的目标是验证“仅靠对话日志能否稳定生成可信总结”，而不是构建多源行为分析系统。
@@ -221,7 +243,7 @@ repo-root/
 
 ## 8. 如何使用
 
-### 当前 Codex 中使用
+### 在 Codex 中使用
 
 在 `Codex CLI` 中直接点名使用：
 
@@ -243,6 +265,36 @@ repo-root/
 从 Codex 日志生成最近两天的工作总结。
 ```
 
+### 在 Claude Code 中使用
+
+`Claude Code` 支持把 `name:` 暴露为 slash command，因此安装后可以直接调用：
+
+```text
+/daily-work
+```
+
+也可以直接说：
+
+```text
+请总结今天已完成且有意义的工作结果。
+请总结最近两天完成了什么。
+```
+
+### 在 OpenClaw 中使用
+
+`OpenClaw` 支持 AgentSkills 兼容目录与 slash command，安装后可以直接调用：
+
+```text
+/daily-work
+```
+
+也可以直接说：
+
+```text
+请总结今天已完成且有意义的工作结果。
+请总结最近两天完成了什么。
+```
+
 ### 时间窗口规则
 
 - 未指定时，默认当天自然日
@@ -256,6 +308,28 @@ repo-root/
 - 多日窗口：`周期内完成`
 
 ## 9. 安装方式
+
+### 安装路径
+
+当前仓库中的真正 Skill 目录是：
+
+```text
+dailyreport/
+```
+
+将它挂到不同宿主的技能目录即可。
+
+| 宿主 | 推荐安装路径 |
+|------|--------------|
+| Codex | `~/.codex/skills/daily-work` |
+| Claude Code | `~/.claude/skills/daily-work` |
+| OpenClaw | `~/.openclaw/skills/daily-work` |
+
+OpenClaw 也支持工作区级 Skill：
+
+```text
+<workspace>/skills/daily-work
+```
 
 ### 本地安装到当前 Codex
 
@@ -284,11 +358,36 @@ ln -s /path/to/repo/dailyreport ~/.codex/skills/daily-work
 
 安装后建议重启 `Codex CLI`，以确保新 Skill 被重新发现。
 
+### 本地安装到 Claude Code
+
+```bash
+mkdir -p ~/.claude/skills
+ln -s /path/to/repo/dailyreport ~/.claude/skills/daily-work
+```
+
+如果 `~/.claude/skills/` 是首次创建，重启 `Claude Code` 以确保它开始监视该目录。
+
+### 本地安装到 OpenClaw
+
+共享技能安装：
+
+```bash
+mkdir -p ~/.openclaw/skills
+ln -s /path/to/repo/dailyreport ~/.openclaw/skills/daily-work
+```
+
+如果希望该 Skill 只在某个工作区内生效，也可以安装到：
+
+```bash
+mkdir -p <workspace>/skills
+ln -s /path/to/repo/dailyreport <workspace>/skills/daily-work
+```
+
 ## 10. 测试方式
 
 ### 最小测试
 
-用于验证 Skill 是否已被 Codex 发现：
+用于验证 Skill 是否已被当前宿主发现：
 
 ```text
 请使用 daily-work skill，总结今天已完成且有意义的工作结果。
@@ -317,6 +416,14 @@ ln -s /path/to/repo/dailyreport ~/.codex/skills/daily-work
 - Skill 能从 `~/.codex/sessions/.../rollout-*.jsonl` 读取会话日志
 - Skill 能输出按结果组织的中文周期总结
 
+`Claude Code` 与 `OpenClaw` 适配本次完成的是：
+
+- Skill 目录结构适配
+- 宿主日志读取规则适配
+- 安装路径与调用方式适配
+
+当前尚未在本机对 `Claude Code` 与 `OpenClaw` 做真实运行验证。
+
 ## 11. Linux 迁移
 
 当前结构非常适合迁移到 Linux，原因是：
@@ -325,10 +432,12 @@ ln -s /path/to/repo/dailyreport ~/.codex/skills/daily-work
 - 蒸馏逻辑都在 `dailyreport/SKILL.md`、`dailyreport/prompts/`、`dailyreport/references/`
 - 唯一平台相关点主要是日志发现路径
 
-只要 Linux 上的 `Codex` 日志结构仍然满足：
+只要 Linux 上对应宿主的日志结构仍然满足：
 
 ```text
-~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+Codex: ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+Claude Code: ~/.claude/projects/**/*.jsonl
+OpenClaw: ~/.openclaw/agents/*/sessions/*.jsonl
 ```
 
 那么这套 Skill 基本可以直接迁移使用。
@@ -336,6 +445,8 @@ ln -s /path/to/repo/dailyreport ~/.codex/skills/daily-work
 如果未来 Linux 侧日志结构与当前不同，通常只需要调整：
 
 - `dailyreport/references/codex_log_workflow.md`
+- `dailyreport/references/claude_code_log_workflow.md`
+- `dailyreport/references/openclaw_log_workflow.md`
 
 而不需要推倒整个蒸馏规则层。
 
@@ -343,9 +454,15 @@ ln -s /path/to/repo/dailyreport ~/.codex/skills/daily-work
 
 当前版本有几个明确限制。
 
-### 只支持 Codex
+### 只支持三类宿主
 
-不支持 `Claude Code`、`OpenCode` 或其他 agent。
+当前只支持：
+
+- `Codex`
+- `Claude Code`
+- `OpenClaw`
+
+不支持其他 agent。
 
 ### 只看对话日志
 
